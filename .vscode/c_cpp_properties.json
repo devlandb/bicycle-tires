@@ -1,0 +1,12 @@
+{
+  "configurations": [
+    {
+      "name": "STM32",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+      "compilerPath": "/usr/bin/arm-none-eabi-gcc",
+      "intelliSenseMode": "gcc-arm",
+      "cStandard": "c11"
+    }
+  ],
+  "version": 4
+}

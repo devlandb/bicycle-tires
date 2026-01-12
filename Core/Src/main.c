@@ -21,6 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "stm32f4xx_hal_conf.h"
+#include "stm32f4xx_it.h"
 
 /* USER CODE END Includes */
 
@@ -45,6 +47,18 @@ ADC_HandleTypeDef hadc1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+float adc_val;
+float vref = 3.3;
+float voltage;
+
+uint16_t count;
+uint16_t pressure;
+
+uint16_t max_pressure = 150; // max pressure of sensor is 150 PSI
+uint16_t min_pressure = 0; // min pressure is 0
+
+uint16_t max_adc = 4095;
+
 
 /* USER CODE END PV */
 
@@ -77,7 +91,7 @@ int main(void)
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
-
+  
   /* USER CODE BEGIN Init */
 
   /* USER CODE END Init */
@@ -94,7 +108,7 @@ int main(void)
   MX_ADC1_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_ADC_Start_IT(&hadc1); // enable adc interrupt/start conversion
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -106,6 +120,24 @@ int main(void)
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
+}
+
+void get_pressure(float voltage) 
+{
+  pressure = (voltage - 0.5) * (150.0/4.0);
+}
+
+void ADC_To_Voltage(uint16_t adcVal)
+{
+  voltage = adc_val * (3.3 / 4095);
+  voltage = voltage * 1.5; // bc of voltage divider
+
+}
+
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
+{
+  adc_val = HAL_ADC_GetValue(&hadc1); // get adc val
+  count++; // increment sample count
 }
 
 /**
