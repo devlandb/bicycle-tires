@@ -47,19 +47,18 @@ ADC_HandleTypeDef hadc1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-float adc_val;
+
 float vref = 3.3;
-float voltage;
 
 uint16_t count;
-uint16_t pressure;
+
 
 uint16_t max_pressure = 150; // max pressure of sensor is 150 PSI
 uint16_t min_pressure = 0; // min pressure is 0
 
 uint16_t max_adc = 4095;
 
-
+volatile uint8_t uart_busy = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -122,22 +121,51 @@ int main(void)
   /* USER CODE END 3 */
 }
 
-void get_pressure(float voltage) 
+void uart_send_pressure(UART_HandleTypeDef *huart, uint16_t psi) 
 {
-  pressure = (voltage - 0.5) * (150.0/4.0);
+  if (uart_busy) {
+    return;
+  }
+  static char buffer[32];
+  int len = snprintf(buffer, sizeof(buffer), "PSI: %d\r\n", psi);
+  uart_busy = 1;
+  HAL_UART_Transmit_IT(&huart2, buffer, len);
 }
 
-void ADC_To_Voltage(uint16_t adcVal)
+int get_pressure(float voltage) 
 {
-  voltage = adc_val * (3.3 / 4095);
+  int pressure = (voltage - 0.5) * (150.0/4.0);
+  if (pressure < min_pressure) {
+    pressure = min_pressure;
+  } else if (pressure > max_pressure) {
+    pressure = max_pressure;
+  }
+  return pressure;
+}
+
+float ADC_To_Voltage(uint16_t adc_val)
+{
+  float voltage = adc_val * (3.3f / 4095.0f);
   voltage = voltage * 1.5; // bc of voltage divider
+  return voltage;
 
 }
 
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
-  adc_val = HAL_ADC_GetValue(&hadc1); // get adc val
+  uint16_t adc_val = HAL_ADC_GetValue(&hadc1); // get adc val
   count++; // increment sample count
+
+  float voltage = ADC_To_Voltage(adc_val);
+  int psi = get_pressure(voltage);
+  uart_send_pressure(huart2, psi);
+}
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+  if (huart == &huart2) {
+    uart_busy = 0;
+  }
 }
 
 /**
@@ -205,10 +233,10 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
   hadc1.Init.ScanConvMode = DISABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
-  hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_Ext_IT11;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.NbrOfConversion = 1;
   hadc1.Init.DMAContinuousRequests = DISABLE;
